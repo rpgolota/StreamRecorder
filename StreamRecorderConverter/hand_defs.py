@@ -41,34 +41,47 @@ class HandJointIndex(Enum):
 
 
 def get_bones() -> np.array:
-    bones = np.array([
-        [HandJointIndex.Wrist.value, HandJointIndex.ThumbMetacarpal.value],
-        [HandJointIndex.ThumbMetacarpal.value, HandJointIndex.ThumbProximal.value],
-        [HandJointIndex.ThumbProximal.value, HandJointIndex.ThumbDistal.value],
-        [HandJointIndex.ThumbDistal.value, HandJointIndex.ThumbTip.value],
-        [HandJointIndex.Wrist.value, HandJointIndex.IndexMetacarpal.value],
-        [HandJointIndex.IndexMetacarpal.value, HandJointIndex.IndexProximal.value],
-        [HandJointIndex.IndexProximal.value, HandJointIndex.IndexIntermediate.value],
-        [HandJointIndex.IndexIntermediate.value, HandJointIndex.IndexDistal.value],
-        [HandJointIndex.IndexDistal.value, HandJointIndex.IndexTip.value],
-        [HandJointIndex.Wrist.value, HandJointIndex.MiddleMetacarpal.value],
-        [HandJointIndex.MiddleMetacarpal.value,
-            HandJointIndex.MiddleProximal.value],
-        [HandJointIndex.MiddleProximal.value,
-            HandJointIndex.MiddleIntermediate.value],
-        [HandJointIndex.MiddleIntermediate.value,
-            HandJointIndex.MiddleDistal.value],
-        [HandJointIndex.MiddleDistal.value, HandJointIndex.MiddleTip.value],
-        [HandJointIndex.Wrist.value, HandJointIndex.RingMetacarpal.value],
-        [HandJointIndex.RingMetacarpal.value, HandJointIndex.RingProximal.value],
-        [HandJointIndex.RingProximal.value, HandJointIndex.RingIntermediate.value],
-        [HandJointIndex.RingIntermediate.value, HandJointIndex.RingDistal.value],
-        [HandJointIndex.RingDistal.value, HandJointIndex.RingTip.value],
-        [HandJointIndex.Wrist.value, HandJointIndex.PinkyMetacarpal.value],
-        [HandJointIndex.PinkyMetacarpal.value, HandJointIndex.PinkyProximal.value],
-        [HandJointIndex.PinkyProximal.value, HandJointIndex.PinkyIntermediate.value],
-        [HandJointIndex.PinkyIntermediate.value, HandJointIndex.PinkyDistal.value],
-        [HandJointIndex.PinkyDistal.value, HandJointIndex.PinkyTip.value]
-    ]
+    bones = np.array(
+        [
+            [HandJointIndex.Wrist.value, HandJointIndex.ThumbMetacarpal.value],
+            [HandJointIndex.ThumbMetacarpal.value, HandJointIndex.ThumbProximal.value],
+            [HandJointIndex.ThumbProximal.value, HandJointIndex.ThumbDistal.value],
+            [HandJointIndex.ThumbDistal.value, HandJointIndex.ThumbTip.value],
+            [HandJointIndex.Wrist.value, HandJointIndex.IndexMetacarpal.value],
+            [HandJointIndex.IndexMetacarpal.value, HandJointIndex.IndexProximal.value],
+            [
+                HandJointIndex.IndexProximal.value,
+                HandJointIndex.IndexIntermediate.value,
+            ],
+            [HandJointIndex.IndexIntermediate.value, HandJointIndex.IndexDistal.value],
+            [HandJointIndex.IndexDistal.value, HandJointIndex.IndexTip.value],
+            [HandJointIndex.Wrist.value, HandJointIndex.MiddleMetacarpal.value],
+            [
+                HandJointIndex.MiddleMetacarpal.value,
+                HandJointIndex.MiddleProximal.value,
+            ],
+            [
+                HandJointIndex.MiddleProximal.value,
+                HandJointIndex.MiddleIntermediate.value,
+            ],
+            [
+                HandJointIndex.MiddleIntermediate.value,
+                HandJointIndex.MiddleDistal.value,
+            ],
+            [HandJointIndex.MiddleDistal.value, HandJointIndex.MiddleTip.value],
+            [HandJointIndex.Wrist.value, HandJointIndex.RingMetacarpal.value],
+            [HandJointIndex.RingMetacarpal.value, HandJointIndex.RingProximal.value],
+            [HandJointIndex.RingProximal.value, HandJointIndex.RingIntermediate.value],
+            [HandJointIndex.RingIntermediate.value, HandJointIndex.RingDistal.value],
+            [HandJointIndex.RingDistal.value, HandJointIndex.RingTip.value],
+            [HandJointIndex.Wrist.value, HandJointIndex.PinkyMetacarpal.value],
+            [HandJointIndex.PinkyMetacarpal.value, HandJointIndex.PinkyProximal.value],
+            [
+                HandJointIndex.PinkyProximal.value,
+                HandJointIndex.PinkyIntermediate.value,
+            ],
+            [HandJointIndex.PinkyIntermediate.value, HandJointIndex.PinkyDistal.value],
+            [HandJointIndex.PinkyDistal.value, HandJointIndex.PinkyTip.value],
+        ]
     )
     return bones

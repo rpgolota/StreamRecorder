@@ -17,13 +17,15 @@ from hand_defs import HandJointIndex
 # This correponds to the scaling factor used by the TUM slam dataset:w
 DEPTH_SCALING_FACTOR = 5000
 
-folders_extensions = [('PV', 'bytes'),
-                      ('Depth AHaT', '[0-9].pgm'),
-                      ('Depth Long Throw', '[0-9].pgm'),
-                      ('VLC LF', '[0-9].pgm'),
-                      ('VLC RF', '[0-9].pgm'),
-                      ('VLC LL', '[0-9].pgm'),
-                      ('VLC RR', '[0-9].pgm')]
+folders_extensions = [
+    ("PV", "bytes"),
+    ("Depth AHaT", "[0-9].pgm"),
+    ("Depth Long Throw", "[0-9].pgm"),
+    ("VLC LF", "[0-9].pgm"),
+    ("VLC RF", "[0-9].pgm"),
+    ("VLC LL", "[0-9].pgm"),
+    ("VLC RR", "[0-9].pgm"),
+]
 
 
 def extract_tar_file(tar_filename, output_path):
@@ -33,7 +35,7 @@ def extract_tar_file(tar_filename, output_path):
 
 
 def load_lut(lut_filename):
-    with open(lut_filename, mode='rb') as depth_file:
+    with open(lut_filename, mode="rb") as depth_file:
         lut = np.frombuffer(depth_file.read(), dtype="f")
         lut = np.reshape(lut, (-1, 3))
     return lut
@@ -44,25 +46,33 @@ def check_framerates(capture_path):
     MillisecondsToSeconds = 1e-3
 
     def get_avg_delta(timestamps):
-        deltas = [(timestamps[i] - timestamps[i-1]) for i in range(1, len(timestamps))]
+        deltas = [
+            (timestamps[i] - timestamps[i - 1]) for i in range(1, len(timestamps))
+        ]
         return np.mean(deltas)
 
     for (img_folder, img_ext) in folders_extensions:
         base_folder = capture_path / img_folder
-        paths = base_folder.glob('*%s' % img_ext)
+        paths = base_folder.glob("*%s" % img_ext)
         timestamps = [int(path.stem) for path in paths]
         if len(timestamps):
             avg_delta = get_avg_delta(timestamps) * HundredsOfNsToMilliseconds
-            print('Average {} delta: {:.3f}ms, fps: {:.3f}'.format(
-                img_folder, avg_delta, 1/(avg_delta * MillisecondsToSeconds)))
+            print(
+                "Average {} delta: {:.3f}ms, fps: {:.3f}".format(
+                    img_folder, avg_delta, 1 / (avg_delta * MillisecondsToSeconds)
+                )
+            )
 
-    head_hat_stream_path = capture_path.glob('*eye.csv')
+    head_hat_stream_path = capture_path.glob("*eye.csv")
     try:
         head_hat_stream_path = next(head_hat_stream_path)
         timestamps = load_head_hand_eye_data(str(head_hat_stream_path))[0]
         hh_avg_delta = get_avg_delta(timestamps) * HundredsOfNsToMilliseconds
-        print('Average hand/head delta: {:.3f}ms, fps: {:.3f}'.format(
-            hh_avg_delta, 1/(hh_avg_delta * MillisecondsToSeconds)))
+        print(
+            "Average hand/head delta: {:.3f}ms, fps: {:.3f}".format(
+                hh_avg_delta, 1 / (hh_avg_delta * MillisecondsToSeconds)
+            )
+        )
     except StopIteration:
         pass
 
@@ -70,7 +80,7 @@ def check_framerates(capture_path):
 def load_head_hand_eye_data(csv_path):
     joint_count = HandJointIndex.Count.value
 
-    data = np.loadtxt(csv_path, delimiter=',')
+    data = np.loadtxt(csv_path, delimiter=",")
 
     n_frames = len(data)
     timestamps = np.zeros(n_frames)
@@ -90,29 +100,38 @@ def load_head_hand_eye_data(csv_path):
         # head
         head_transs[i_frame, :] = frame[1:17].reshape((4, 4))[:3, 3]
         # left hand
-        left_hand_transs_available[i_frame] = (frame[17] == 1)
+        left_hand_transs_available[i_frame] = frame[17] == 1
         left_start_id = 18
         for i_j in range(joint_count):
             j_start_id = left_start_id + 16 * i_j
-            j_trans = frame[j_start_id:j_start_id + 16].reshape((4, 4))[:3, 3]
+            j_trans = frame[j_start_id : j_start_id + 16].reshape((4, 4))[:3, 3]
             left_hand_transs[i_frame, i_j, :] = j_trans
         # right hand
         right_hand_transs_available[i_frame] = (
-            frame[left_start_id + joint_count * 4 * 4] == 1)
+            frame[left_start_id + joint_count * 4 * 4] == 1
+        )
         right_start_id = left_start_id + joint_count * 4 * 4 + 1
         for i_j in range(joint_count):
             j_start_id = right_start_id + 16 * i_j
-            j_trans = frame[j_start_id:j_start_id + 16].reshape((4, 4))[:3, 3]
+            j_trans = frame[j_start_id : j_start_id + 16].reshape((4, 4))[:3, 3]
             right_hand_transs[i_frame, i_j, :] = j_trans
 
-        assert(j_start_id + 16 == 851)
-        gaze_available[i_frame] = (frame[851] == 1)
+        assert j_start_id + 16 == 851
+        gaze_available[i_frame] = frame[851] == 1
         gaze_data[i_frame, :4] = frame[852:856]
         gaze_data[i_frame, 4:8] = frame[856:860]
         gaze_data[i_frame, 8] = frame[860]
 
-    return (timestamps, head_transs, left_hand_transs, left_hand_transs_available,
-            right_hand_transs, right_hand_transs_available, gaze_data, gaze_available)
+    return (
+        timestamps,
+        head_transs,
+        left_hand_transs,
+        left_hand_transs_available,
+        right_hand_transs,
+        right_hand_transs_available,
+        gaze_data,
+        gaze_available,
+    )
 
 
 def project_on_pv(points, pv_img, pv2world_transform, focal_length, principal_point):
@@ -122,8 +141,13 @@ def project_on_pv(points, pv_img, pv2world_transform, focal_length, principal_po
     world2pv_transform = np.linalg.inv(pv2world_transform)
     points_pv = (world2pv_transform @ homog_points.T).T[:, :3]
 
-    intrinsic_matrix = np.array([[focal_length[0], 0, width-principal_point[0]], [
-        0, focal_length[1], principal_point[1]], [0, 0, 1]])
+    intrinsic_matrix = np.array(
+        [
+            [focal_length[0], 0, width - principal_point[0]],
+            [0, focal_length[1], principal_point[1]],
+            [0, 0, 1],
+        ]
+    )
     rvec = np.zeros(3)
     tvec = np.zeros(3)
     xy, _ = cv2.projectPoints(points_pv, rvec, tvec, intrinsic_matrix, None)
@@ -144,7 +168,7 @@ def project_on_pv(points, pv_img, pv2world_transform, focal_length, principal_po
         depth_image[p[1], p[0]] = z[i]
 
     colors = pv_img[xy[:, 1], xy[:, 0], :]
-    rgb[valid_ids, :] = colors[:, ::-1] / 255.
+    rgb[valid_ids, :] = colors[:, ::-1] / 255.0
 
     return rgb, depth_image
 
@@ -170,6 +194,6 @@ def project_on_depth(points, rgb, intrinsic_matrix, width, height):
         depth_image[p[1], p[0]] = z[i]
         image[p[1], p[0]] = rgb[i]
 
-    image = image * 255.
+    image = image * 255.0
 
     return image, depth_image

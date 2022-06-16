@@ -18,7 +18,7 @@ def process_all(w_path, project_hand_eye=False):
     # Extract all tar
     for tar_fname in w_path.glob("*.tar"):
         print(f"Extracting {tar_fname}")
-        tar_output = ''
+        tar_output = ""
         tar_output = w_path / Path(tar_fname.stem)
         tar_output.mkdir(exist_ok=True)
         extract_tar_file(tar_fname, tar_output)
@@ -31,7 +31,7 @@ def process_all(w_path, project_hand_eye=False):
         # Project
         if project_hand_eye:
             project_hand_eye_to_pv(w_path)
-# Process depth if recorded
+    # Process depth if recorded
     for sensor_name in ["Depth Long Throw", "Depth AHaT"]:
         if (w_path / "{}.tar".format(sensor_name)).exists():
             # Save point clouds
@@ -40,14 +40,17 @@ def process_all(w_path, project_hand_eye=False):
     check_framerates(w_path)
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Process recorded data.')
-    parser.add_argument("--recording_path", required=True,
-                        help="Path to recording folder")
-    parser.add_argument("--project_hand_eye",
-                        required=False,
-                        action='store_true',
-                        help="Project hand joints (and eye gaze, if recorded) to rgb images")
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Process recorded data.")
+    parser.add_argument(
+        "--recording_path", required=True, help="Path to recording folder"
+    )
+    parser.add_argument(
+        "--project_hand_eye",
+        required=False,
+        action="store_true",
+        help="Project hand joints (and eye gaze, if recorded) to rgb images",
+    )
 
     args = parser.parse_args()
 

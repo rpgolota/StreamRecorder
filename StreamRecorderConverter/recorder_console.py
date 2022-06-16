@@ -1,24 +1,8 @@
-"""
- Copyright (c) Microsoft. All rights reserved.
- This code is licensed under the MIT License (MIT).
- THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
- ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
- IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
- PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
-"""
 import cmd
-import json
-import tarfile
-import argparse
-import urllib.request
 from pathlib import Path
-from urllib.parse import quote
-
-from cv2 import add
 from process_all import process_all
 
-import ssl
-ssl._create_default_https_context = ssl._create_unverified_context
+from connection import HololensInterface, Auth
 
 
 class RecorderShell(cmd.Cmd):
@@ -26,62 +10,131 @@ class RecorderShell(cmd.Cmd):
     w_path = None
 
     # cmd variables
-    intro = 'Welcome to the recorder shell.   Type help or ? to list commands.\n'
-    prompt = '(recorder console) '
+    intro = "Welcome to the recorder shell.   Type help or ? to list commands.\n"
+    prompt = "(recorder console) "
 
-    ruler = '-'
+    ruler = "-"
 
-    def __init__(self, w_path, dev_portal_browser):
+    def __init__(self, w_path, holo: HololensInterface):
         super().__init__()
-        self.dev_portal_browser = dev_portal_browser
+        self.holo = holo
         self.w_path = w_path
+
+        packages = holo.get_packages()
+        self.package_full_name = None
+        self.package_relative_id = None
+        for package in packages:
+            if package["Name"] == "StreamRecorder":
+                self.package_full_name = package["PackageFullName"]
+                self.package_relative_id = package["PackageRelativeId"]
+
+        if self.package_full_name:
+            print("[!] Found StreamRecorder:", self.package_full_name)
+        else:
+            raise ValueError("StreamRecorder not installed on device")
+
+        self.do_list(None)
 
     def do_help(self, arg):
         print_help()
-        
+
     def do_reconnect(self, arg):
-        self.dev_portal_browser.reconnect()
+        self.holo.reconnect()
 
     def do_exit(self, arg):
         return True
 
     def do_list(self, arg):
         print("Device recordings:")
-        self.dev_portal_browser.list_recordings()
+        self.do_list_device(None)
         print("Workspace recordings:")
         list_workspace_recordings(self.w_path)
 
+    def get_device_list(self):
+        recordings = self.holo.get_files(
+            "LocalAppData", self.package_full_name, "LocalState"
+        )
+
+        recording_names = []
+        for r in recordings:
+            files = self.holo.get_files(
+                "LocalAppData", self.package_full_name, f"LocalState/{r['Id']}"
+            )
+            if len(files) > 0:
+                recording_names.append(r["Id"])
+
+        recording_names.sort()
+        return recording_names
+
     def do_list_device(self, arg):
-        self.dev_portal_browser.list_recordings()
+
+        recording_names = self.get_device_list()
+
+        for i, recording_name in enumerate(recording_names):
+            print("[{: 6d}]  {}".format(i, recording_name))
+        if len(recording_names) == 0:
+            print("=> No recordings found on Hololens")
 
     def do_list_workspace(self, arg):
         list_workspace_recordings(self.w_path)
+
+    def download_recording(self, name):
+
+        recording_path = self.w_path / name
+        recording_path.mkdir(exist_ok=True)
+
+        print("[!] Downloading recording {}...".format(name))
+
+        files = self.holo.get_files(
+            "LocalAppData", self.package_full_name, f"LocalState/{name}"
+        )
+
+        for file in files:
+            if file["Type"] != 32:
+                continue
+
+            destination_path = recording_path / file["Id"]
+            if destination_path.exists():
+                print("[!] => Skipping, already downloaded:", file["Id"])
+                continue
+
+            print("    => Downloading:", file["Id"])
+            self.holo.download_file(
+                "LocalAppData", file["Id"], self.package_full_name, f"LocalState/{name}"
+            ).save(destination_path)
+
+    def delete_recording(self, name):
+
+        print("[!] Deleting recording {}...".format(name))
+        self.holo.delete_file(
+            "LocalAppData", name, self.package_full_name, "LocalState"
+        )
 
     def do_download(self, arg):
         try:
             recording_idx = int(arg)
             if recording_idx is not None:
-                self.dev_portal_browser.download_recording(
-                    recording_idx, self.w_path)
+                self.download_recording(self.get_device_list()[recording_idx])
         except ValueError:
-            print(f"I can't download {arg}")
-
+            print(f"[!] I can't download {arg}")
 
     def do_download_all(self, arg):
-        for recording_idx in range(len(self.dev_portal_browser.recording_names)):
-            self.dev_portal_browser.download_recording(recording_idx, self.w_path)
+        recordings = self.get_device_list()
+        for record in recordings:
+            self.download_recording(record)
 
     def do_delete_all(self, arg):
-        for _ in range(len(self.dev_portal_browser.recording_names)):
-            self.dev_portal_browser.delete_recording(0)
+        recordings = self.get_device_list()
+        for record in recordings:
+            self.delete_recording(record)
 
     def do_delete(self, arg):
         try:
             recording_idx = int(arg)
             if recording_idx is not None:
-                self.dev_portal_browser.delete_recording(recording_idx)
+                self.delete_recording(self.get_device_list()[recording_idx])
         except ValueError:
-            print(f"I can't delete {arg}")
+            print(f"[!] I can't delete {arg}")
 
     def do_process(self, arg):
         try:
@@ -91,197 +144,11 @@ class RecorderShell(cmd.Cmd):
                     recording_names = sorted(self.w_path.glob("*"))
                     recording_name = recording_names[recording_idx]
                 except IndexError:
-                    print("=> Recording does not exist")
+                    print("[!] => Recording does not exist")
                 else:
-                    process_all(
-                        recording_name, True)
+                    process_all(recording_name, True)
         except ValueError:
-            print(f"I can't extract {arg}")
-            
-    def do_run_app(self, arg):
-        self.dev_portal_browser.run_app()
-
-
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--dev_portal_address", default="127.0.0.1:10080",
-                        help="The IP address for the HoloLens Device Portal")
-    parser.add_argument("--dev_portal_username", required=True,
-                        help="The username for the HoloLens Device Portal")
-    parser.add_argument("--dev_portal_password", required=True,
-                        help="The password for the HoloLens Device Portal")
-    parser.add_argument("--workspace_path", required=True,
-                        help="Path to workspace folder used for downloading "
-                             "recordings")
-
-    args = parser.parse_args()
-
-    return args
-
-
-class DevicePortalBrowser(object):
-
-    def __init__(self):
-        
-        self.address = None
-        self.username = None
-        self.password = None
-
-    def reconnect(self):
-        self.connect(self.address, self.username, self.password)
-
-    def connect(self, address, username, password):
-        
-        self.address = address
-        self.username = username
-        self.password = password
-        
-        print("Connecting to HoloLens Device Portal...")
-        self.url = "https://{}".format(address)
-        password_manager = urllib.request.HTTPPasswordMgrWithDefaultRealm()
-        password_manager.add_password(None, self.url, username, password)
-        handler = urllib.request.HTTPBasicAuthHandler(password_manager)
-        opener = urllib.request.build_opener(handler)
-        opener.open(self.url)
-        urllib.request.install_opener(opener)
-
-        print("=> Connected to HoloLens at address:", self.url)
-
-        print("Searching for StreamRecorder application...")
-
-        response = urllib.request.urlopen(
-            "{}/api/app/packagemanager/packages".format(self.url))
-        packages = json.loads(response.read().decode())
-
-        self.package_full_name = None
-        for package in packages["InstalledPackages"]:
-            if package["Name"] == "StreamRecorder":
-                self.package_full_name = package["PackageFullName"]
-                self.package_relative_id = package["PackageRelativeId"]
-                break
-        assert self.package_full_name is not None, \
-            "CV: Recorder package must be installed on HoloLens"
-
-        print("=> Found StreamRecorder application with name:",
-              self.package_full_name)
-
-        print("Searching for recordings...")
-        urlrequest = f'{self.url}/api/filesystem/apps/files?knownfolderid=LocalAppData&packagefullname={quote(self.package_full_name)}&path=\\LocalState'
-
-        response = urllib.request.urlopen(urlrequest)
-        recordings = json.loads(response.read().decode())
-
-        self.recording_names = []
-        for recording in recordings["Items"]:
-            # Check if the recording contains any file data.
-            request_url = "{}/api/filesystem/apps/files?knownfolderid=LocalAppData&packagefullname={}&path={}".format(
-                self.url, self.package_full_name, "\\LocalState\\" + recording["Id"])
-            response = urllib.request.urlopen(request_url)
-            files = json.loads(response.read().decode())
-            if len(files["Items"]) > 0:
-                self.recording_names.append(recording["Id"])
-        self.recording_names.sort()
-
-        print("=> Found a total of {} recordings".format(
-              len(self.recording_names)))
-
-    def list_recordings(self, verbose=True):
-        for i, recording_name in enumerate(self.recording_names):
-            print("[{: 6d}]  {}".format(i, recording_name))
-
-        if len(self.recording_names) == 0:
-            print("=> No recordings found on device")
-
-    def get_recording_name(self, recording_idx):
-        try:
-            return self.recording_names[recording_idx]
-        except IndexError:
-            print("=> Recording does not exist")
-
-    def download_recording(self, recording_idx, w_path):
-        recording_name = self.get_recording_name(recording_idx)
-        if recording_name is None:
-            return
-
-        recording_path = w_path / recording_name
-        recording_path.mkdir(exist_ok=True)
-
-        print("Downloading recording {}...".format(recording_name))
-
-        response = urllib.request.urlopen(
-            "{}/api/filesystem/apps/files?knownfolderid="
-            "LocalAppData&packagefullname={}&path=\\LocalState\\{}".format(
-                self.url, self.package_full_name, recording_name))
-        files = json.loads(response.read().decode())
-
-        for file in files["Items"]:
-            if file["Type"] != 32:
-                continue
-
-            destination_path = recording_path / file["Id"]
-            if destination_path.exists():
-                print("=> Skipping, already downloaded:", file["Id"])
-                continue
-
-            print("=> Downloading:", file["Id"])
-            urllib.request.urlretrieve(
-                "{}/api/filesystem/apps/file?knownfolderid=LocalAppData&"
-                "packagefullname={}&filename=\\LocalState\\{}\\{}".format(
-                    self.url, self.package_full_name,
-                    recording_name, quote(file["Id"])), str(destination_path))
-
-    def delete_recording(self, recording_idx):
-        recording_name = self.get_recording_name(recording_idx)
-        if recording_name is None:
-            return
-
-        print("Deleting recording {}...".format(recording_name))
-
-        response = urllib.request.urlopen(
-            "{}/api/filesystem/apps/files?knownfolderid="
-            "LocalAppData&packagefullname={}&path=\\\\LocalState\\{}".format(
-                self.url, self.package_full_name, recording_name))
-        files = json.loads(response.read().decode())
-
-        for file in files["Items"]:
-            if file["Type"] != 32:
-                continue
-
-            print("=> Deleting:", file["Id"])
-            urllib.request.urlopen(urllib.request.Request(
-                "{}/api/filesystem/apps/file?knownfolderid=LocalAppData&"
-                "packagefullname={}&filename=\\\\LocalState\\{}\\{}".format(
-                    self.url, self.package_full_name,
-                    recording_name, quote(file["Id"])), method="DELETE"))
-
-        self.recording_names.remove(recording_name)
-        
-    # def run_app(self):
-        
-    #     # from pprint import pprint
-    #     # pprint()
-        
-    #     # find running processes
-    #     response = urllib.request.urlopen(
-    #         "{}/api/resourcemanager/processes".format(self.url))
-        
-    #     procs = json.loads(response.read().decode())["Processes"]
-        
-    #     running = False
-    #     for proc in procs:
-    #         if proc.get("PackageFullName", "") == self.package_full_name:
-    #             running = True
-    #             break
-            
-    #     if running:
-    #         print("=> App was already running. Attempting to stop...")
-    #         import base64
-    #         print()
-    #         response = urllib.request.urlopen(urllib.request.Request(
-    #             "{}/api/taskmanager/app?package={}".format(
-    #                 self.url, base64.b64encode(self.package_full_name.encode("ascii")).decode("ascii")), method="DELETE"))
-    #         print(response)
-
+            print(f"[!] I can't extract {arg}")
 
 
 def print_help():
@@ -304,27 +171,27 @@ def list_workspace_recordings(w_path):
     for i, recording_name in enumerate(recording_names):
         print("[{: 6d}]  {}".format(i, recording_name.name))
     if len(recording_names) == 0:
-        print("=> No recordings found in workspace")
+        print("    => No recordings found in workspace")
 
 
 def main():
-    args = parse_args()
 
-    w_path = Path(args.workspace_path)
+    address = "10.0.0.208"  # change to the ip for your hololens device portal
+    login = Auth(
+        "admin22", "admin22"
+    )  # set to None if no username and password is requred
+    w_path = Path(
+        "downloads"
+    )  # change to the directory of to where files where be downloaded
+
     w_path.mkdir(exist_ok=True)
-
-    dev_portal_browser = DevicePortalBrowser()
-    dev_portal_browser.connect(args.dev_portal_address,
-                               args.dev_portal_username,
-                               args.dev_portal_password)
+    holo = HololensInterface(address, auth=login).connect()
 
     print()
     print_help()
     print()
 
-    dev_portal_browser.list_recordings()
-
-    rs = RecorderShell(w_path, dev_portal_browser)
+    rs = RecorderShell(w_path, holo)
     rs.cmdloop()
 
 
