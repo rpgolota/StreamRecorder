@@ -1,19 +1,7 @@
----
-page_type: sample
-name: Stream Recorder sample
-description: Sample Holographic UWP application that captures data streams and saves them to disk on HoloLens 2 devices.
-languages:
-- cpp
-products:
-- windows-mixed-reality
-- hololens
----
+# Stream Recorder (Modified) 
 
-# Stream Recorder sample 
-
-![License](https://img.shields.io/badge/license-MIT-green.svg)
-
-The StreamRecorder app captures and saves to disk the following HoloLens streams: VLC cameras, Long throw depth, AHAT depth, PV (i.e. RGB), head tracking, hand tracking, eye gaze tracking.
+This modified stream recorder can be used in the same way as originally intended: (https://github.com/microsoft/HoloLens2ForCV/tree/main/Samples/StreamRecorder).
+The modifications to it and the processing scripts allow for easy eye data collection.
 
 ## Contents
 
@@ -25,7 +13,8 @@ The StreamRecorder app captures and saves to disk the following HoloLens streams
 
 ## Prerequisites
 
-* Install the [latest Mixed Reality tools](https://docs.microsoft.com/windows/mixed-reality/develop/install-the-tools)
+* Windows Device Portal set up for the hololens.
+* Python3 installed with numpy, opencv-python, open3d for compatibility with all StreamRecorder features.
 
 ## Setup
 
@@ -34,80 +23,40 @@ The StreamRecorder app captures and saves to disk the following HoloLens streams
 
 ## Running the app
 
-1. Run from the debugger in Visual Studio by pressing F5
-2. The app will show up in the start menu in HoloLens
+1. Find StreamRecorder on the hololens under all apps.
+2. Open StreamRecorder.
+3. Press Start to begin recording.
+4. Press Stop to stop the recording.
 
-## Key concepts
+## Downloading the data
 
-Refer to the **Docs/ResearchMode-ApiDoc.pdf** documentation, and pay special attention to the sections on: 
-* **Consent Prompts**
-* **Main Sensor Reading Loop**
-* **Camera Sensors**
-* **Sensors > Sensor Frames**
-* **Sensor Coordinate Frames > Integrating with Perception APIs**
-* **Sensor Coordinate Frames > Map and un-map APIs**
+1. Run `recorder_console.py` after having changed the three lines in side containing the ip address of the device portal, and login information.
+2. Run `list` to see the available recordings to download.
+3. Run `download <X>` to download the x'th recording.
 
-**Capturing Streams**
+## Key differences
 
-The streams to be captured should be specified at compile time, by modifying appropriately the first lines of AppMain.cpp.
+**StreamRecorderApp**
 
-For example:
+The stream recording modes allow for different streams to be captures.
+As this modified version focuses on Eye data collection, if only the eye stream is enabled, then the output will only contain a csv file with eye data in it.
+The following lines in AppMain.cpp are set to ensure this.
 ```
-std::vector<ResearchModeSensorType> AppMain::kEnabledRMStreamTypes = { ResearchModeSensorType::DEPTH_LONG_THROW };
-std::vector<StreamTypes> AppMain::kEnabledStreamTypes = { StreamTypes::PV };
+std::vector<ResearchModeSensorType> AppMain::kEnabledRMStreamTypes = { };
+std::vector<StreamTypes> AppMain::kEnabledStreamTypes = { StreamTypes::EYE };
 ```
-
-After app deployment, you should see a menu with two buttons, **Start** and **s**. Push Start to start the capture and Stop when you are done.
 
 **Recorded data**
 
-The files saved by the app can be accessed via Device Portal, under:
-```
-System->FileExplorer->LocalAppData->StreamRecorder->LocalState
-```
-The app creates one folder per capture.
+The file saved will be a csv file containing the following data:
+| Timestamp | EyePresent | Origin X | Origin Y | Origin Z | Origin W | Direction X | Direction Y | Direction Z | Direction W | Distance |
+|-|-|-|-|-|-|-|-|-|-|-|
 
-However, it is possible (and recommended) to use the `StreamRecorderConverter/recorder_console.py` script for data download and automated processing.
+The timestamp is recorded in windows Integer8 format (100-nanoseconds elapsed since January 1, 1601 UTC). 
 
-To use the recorder console, you can run:
-```
-python StreamRecorderConverter/recorder_console.py --workspace_path <output_folder>  --dev_portal_username <user> --dev_portal_password <password>
-```
+**StreamRecorderConverter**
 
-then use the`download` command to download from HoloLens to the output folder and then use the `process` command.
+The post processing script `recorder_console.py` was changed to use a custom HololensInterface, using the python requests module instead of urllib.
+This cleans up the code significantly and make it much more usable.
 
-**Python postprocessing**
-
-To postprocess the recorded data, you can use the python scripts inside the `StreamRecorderConverter` folder.
-
-Requirements: python3 with numpy, opencv-python, open3d.
-
-The app comes with a set of python scripts. Note that all the functionalities provided by these scripts can be accessed via the `recorder_console.py` script, which in turn launches `process_all.py`, so there is in principle no need to use single scripts.
-
-- All the scripts listed below can be launched by running `process_all.py`:
-```
-  python process_all.py --recording_path <path_to_capture_folder>
-```
-
-- PV (RGB) frames are saved in raw format. To obtain RGB png images, you can run the `convert_images.py` script:
-```
-  python convert_images.py --recording_path <path_to_capture_folder>
-```
-
-- To see hand tracking and eye gaze tracking results projected on PV images, you can run:
-```
-  python project_hand_eye_to_pv.py --recording_path <path_to_capture_folder>
-```
-
-- To obtain (colored) point clouds from depth images and save them as ply files, you can run the `save_pclouds.py` script.
-
-All the point clouds are computed in the world coordinate system, unless the `cam_space` parameter is used. If PV frames were captured, the script will try to color the point clouds accordingly.
-
-- To try our sample showcasing Truncated Signed Distance Function (TSDF) integration with open3d, you can run:
-```
-  python tsdf-integration.py --pinhole_path <path_to_pinhole_projected_camera>
-```
-
-## See also
-
-* [Research Mode for HoloLens](https://docs.microsoft.com/windows/mixed-reality/develop/platform-capabilities-and-apis/research-mode)
+This new code is seen in `connection.py`.
