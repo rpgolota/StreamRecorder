@@ -182,7 +182,7 @@ def main():
     )  # set to None if no username and password is requred
     w_path = Path(
         "downloads"
-    )  # change to the directory of to where files where be downloaded
+    )  # set to desired download folder path
 
     w_path.mkdir(exist_ok=True)
     holo = HololensInterface(address, auth=login).connect()
